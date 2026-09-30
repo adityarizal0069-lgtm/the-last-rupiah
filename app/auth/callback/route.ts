@@ -6,10 +6,14 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/sign-in", requestUrl.origin));
+    return NextResponse.redirect(
+      new URL("/sign-in?error=missing_code", requestUrl.origin)
+    );
   }
 
-  const response = NextResponse.redirect(new URL("/", requestUrl.origin));
+  const response = NextResponse.redirect(
+    new URL("/", requestUrl.origin)
+  );
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,20 +21,25 @@ export async function GET(request: Request) {
     {
       cookies: {
         getAll() {
-          return request.headers
-            .get("cookie")
-            ?.split(";")
+          return (request.headers.get("cookie") ?? "")
+            .split(";")
             .filter(Boolean)
             .map((cookie) => {
-              const [name, ...valueParts] = cookie.trim().split("=");
+              const separator = cookie.indexOf("=");
+              if (separator === -1) {
+                return null;
+              }
 
               return {
-                name,
-                value: valueParts.join("="),
+                name: cookie.slice(0, separator).trim(),
+                value: cookie.slice(separator + 1).trim(),
               };
-            }) ?? [];
+            })
+            .filter(
+              (cookie): cookie is { name: string; value: string } =>
+                cookie !== null
+            );
         },
-
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -40,10 +49,11 @@ export async function GET(request: Request) {
     }
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } =
+    await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    console.error("OAuth callback error:", error);
+    console.error("OAuth callback error:", error.message);
 
     return NextResponse.redirect(
       new URL("/sign-in?error=auth", requestUrl.origin)
