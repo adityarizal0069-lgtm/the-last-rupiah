@@ -7,9 +7,19 @@ A personal finance tracker built to help users manage their income, expenses, an
 
 Visit the deployed application: [The Last Rupiah](https://the-last-rupiah.vercel.app/)
 
-## Screenshot
+## Screenshots
+
+### Dashboard
 
 ![The Last Rupiah dashboard](screenshots/dashboard.png)
+
+### Historical Analytics
+
+![The Last Rupiah historical analytics](screenshots/analytics.png)
+
+### Mobile Layout
+
+![The Last Rupiah mobile layout](screenshots/mobile.png)
 
 ## Features
 
