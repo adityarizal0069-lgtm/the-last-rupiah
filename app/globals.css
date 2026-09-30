@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f4;
+  --surface: #ffffff;
+  --surface-soft: #f1f5f0;
+  --surface-green: #e8f1e8;
+
+  --text: #171a17;
+  --text-secondary: #626a62;
+  --text-light: #8a928a;
+
+  --green: #166534;
+  --green-hover: #14532d;
+  --green-light: #dcf0df;
+  --green-border: #c8ddca;
+
+  --border: #e2e6e1;
+  --border-dark: #d2d8d1;
+
+  --danger: #b42318;
+  --danger-light: #fef0ef;
+
+  --shadow-sm: 0 1px 2px rgba(20, 40, 20, 0.04);
+  --shadow-md: 0 8px 24px rgba(20, 40, 20, 0.07);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-foreground: var(--text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
 }
 
 body {
+  min-height: 100vh;
+  margin: 0;
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.page-container {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  background: var(--green);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 650;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.primary-button:hover {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+}
+
+.primary-button:active {
+  transform: translateY(1px);
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid var(--border-dark);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.secondary-button:hover {
+  background: var(--surface-soft);
+  border-color: #bdc6bc;
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    width: min(100% - 28px, 1180px);
+  }
 }
