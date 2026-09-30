@@ -1,38 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+# The Last Rupiah
+
+A personal finance tracker built to help users manage their income, expenses, and monthly balance in one place.
+
+## Live Demo
+
+Visit the deployed application: [The Last Rupiah](https://the-last-rupiah.vercel.app/)
+
+## Features
+
+- **Expense Tracking** — Record and manage daily expenses.
+- **Income Tracking** — Keep track of money coming in.
+- **Category Management** — Organize financial transactions by category.
+- **Monthly Overview** — Review income, expenses, and remaining balance.
+- **Historical Analytics** — Review financial activity across different months.
+- **Local Storage** — Use the application without creating an account.
+- **Google Authentication** — Optionally sign in using Google.
+- **Data Synchronization** — Choose whether to keep device data or account data when synchronizing.
+- **Responsive Interface** — Use the application on desktop and mobile devices.
+
+## Tech Stack
+
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Supabase
+- Browser Local Storage
+- Vercel
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js
+- npm
+- A Supabase project (for authentication and cloud features)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   git clone https://github.com/adityarizal0069-lgtm/the-last-rupiah.git
+   ```
 
-## Learn More
+2. Navigate into the project directory:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   cd the-last-rupiah
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Install dependencies:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   npm install
+   ```
 
-## Deploy on Vercel
+4. Create a `.env.local` file in the project root and configure the required environment variables:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   Keep your service role key private. Never commit real secrets to GitHub.
 
-Deployment setup verified.
+5. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000).
+
+## Project Goals
+
+The Last Rupiah was built to provide a straightforward way to track personal finances, with support for both anonymous device-based usage and optional account-based synchronization.
+
+## Author
+
+**Mohammad Aditya Fahrizal**
+
+- GitHub: [@adityarizal0069-lgtm](https://github.com/adityarizal0069-lgtm)
+
+## License
+
+No license has been specified yet.
