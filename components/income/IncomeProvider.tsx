@@ -229,6 +229,13 @@ export function IncomeProvider({
         return;
       }
 
+      /*
+       * Load the local data before loading the account data.
+       * If both exist, preserve the local data until SyncProvider
+       * asks the user which dataset should be kept.
+       */
+      const localIncome = loadLocalIncome();
+
       const accountIncome =
         await loadAccountIncome(currentUser);
 
@@ -245,7 +252,30 @@ export function IncomeProvider({
         return;
       }
 
-      if (accountIncome.length === 0) {
+      /*
+       * When both device and account data exist, do not silently
+       * replace the device data with account data.
+       *
+       * SyncProvider detects the same conflict and displays the
+       * explicit Keep device data / Keep account data choice.
+       */
+      if (
+        localIncome.length > 0 &&
+        accountIncome.length > 0
+      ) {
+        setIncome(localIncome);
+        setIsLoaded(true);
+        return;
+      }
+
+      /*
+       * If the account has no income but local income exists,
+       * preserve the existing automatic migration behavior.
+       */
+      if (
+        accountIncome.length === 0 &&
+        localIncome.length > 0
+      ) {
         const migratedIncome =
           await migrateLocalIncome(currentUser);
 
@@ -260,6 +290,9 @@ export function IncomeProvider({
         }
       }
 
+      /*
+       * No conflict exists, so the account data can be loaded normally.
+       */
       setIncome(accountIncome);
       setIsLoaded(true);
     }

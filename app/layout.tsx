@@ -17,8 +17,32 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "The Last Rupiah",
-  description: "A simple and thoughtful way to track your expenses.",
+  metadataBase: new URL("https://lastrupiah.com"),
+  title: {
+    default: "The Last Rupiah — Simple Expense Tracker",
+    template: "%s | The Last Rupiah",
+  },
+  description:
+    "The Last Rupiah is a simple and thoughtful expense tracker for managing expenses, income, and personal finances.",
+  applicationName: "The Last Rupiah",
+  openGraph: {
+    title: "The Last Rupiah — Simple Expense Tracker",
+    description:
+      "A simple and thoughtful way to track expenses, income, and personal finances.",
+    url: "https://lastrupiah.com",
+    siteName: "The Last Rupiah",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "The Last Rupiah — Simple Expense Tracker",
+    description:
+      "A simple and thoughtful way to track expenses, income, and personal finances.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

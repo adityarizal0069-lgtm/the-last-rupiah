@@ -228,6 +228,13 @@ export function ExpenseProvider({
         return;
       }
 
+      /*
+       * Load the local data before loading the account data.
+       * If both exist, preserve the local data until SyncProvider
+       * asks the user which dataset should be kept.
+       */
+      const localExpenses = loadLocalExpenses();
+
       const accountExpenses =
         await loadAccountExpenses(currentUser);
 
@@ -244,7 +251,30 @@ export function ExpenseProvider({
         return;
       }
 
-      if (accountExpenses.length === 0) {
+      /*
+       * When both device and account data exist, do not silently
+       * replace the device data with account data.
+       *
+       * SyncProvider detects the same conflict and displays the
+       * explicit Keep device data / Keep account data choice.
+       */
+      if (
+        localExpenses.length > 0 &&
+        accountExpenses.length > 0
+      ) {
+        setExpenses(localExpenses);
+        setIsLoaded(true);
+        return;
+      }
+
+      /*
+       * If the account has no expenses but local expenses exist,
+       * preserve the existing automatic migration behavior.
+       */
+      if (
+        accountExpenses.length === 0 &&
+        localExpenses.length > 0
+      ) {
         const migratedExpenses =
           await migrateLocalExpenses(currentUser);
 
@@ -259,6 +289,9 @@ export function ExpenseProvider({
         }
       }
 
+      /*
+       * No conflict exists, so the account data can be loaded normally.
+       */
       setExpenses(accountExpenses);
       setIsLoaded(true);
     }
