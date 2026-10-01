@@ -12,106 +12,105 @@ import {
   Income,
   INCOME_CATEGORIES,
   INCOME_STORAGE_KEY,
-  type IncomeCategory,
 } from "@/lib/income";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-type IncomeInput = {
-  description: string;
-  amount: number;
-  category: IncomeCategory;
-  date: string;
-};
-
 type IncomeContextValue = {
   income: Income[];
-  addIncome: (income: IncomeInput) => void;
-  updateIncome: (id: string, income: IncomeInput) => void;
-  deleteIncome: (id: string) => void;
+  isLoaded: boolean;
+  addIncome: (
+    description: string,
+    amount: number,
+    category: Income["category"],
+    date: string,
+  ) => Promise<void>;
+  updateIncome: (
+    id: string,
+    description: string,
+    amount: number,
+    category: Income["category"],
+    date: string,
+  ) => Promise<void>;
+  deleteIncome: (id: string) => Promise<void>;
 };
 
-const IncomeContext = createContext<IncomeContextValue | undefined>(
-  undefined,
-);
+const IncomeContext = createContext<
+  IncomeContextValue | undefined
+>(undefined);
 
 const supabase = createSupabaseBrowserClient();
 
-function isValidIncome(value: unknown): value is Income {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const income = value as Record<string, unknown>;
-
-  return (
-    typeof income.id === "string" &&
-    typeof income.description === "string" &&
-    income.description.trim().length > 0 &&
-    typeof income.amount === "number" &&
-    Number.isFinite(income.amount) &&
-    income.amount >= 0 &&
-    typeof income.category === "string" &&
-    INCOME_CATEGORIES.includes(
-      income.category as (typeof INCOME_CATEGORIES)[number],
-    ) &&
-    typeof income.date === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(income.date) &&
-    typeof income.createdAt === "string"
-  );
-}
-
 function loadLocalIncome(): Income[] {
   try {
-    const savedIncome = window.localStorage.getItem(
+    const savedData = window.localStorage.getItem(
       INCOME_STORAGE_KEY,
     );
 
-    if (!savedIncome) {
+    if (!savedData) {
       return [];
     }
 
-    const parsedIncome: unknown = JSON.parse(savedIncome);
+    const parsedData: unknown = JSON.parse(savedData);
 
-    if (!Array.isArray(parsedIncome)) {
+    if (!Array.isArray(parsedData)) {
       return [];
     }
 
-    return parsedIncome.filter(isValidIncome);
+    return parsedData as Income[];
   } catch {
-    console.error("Unable to load saved income.");
+    console.error(
+      "[INCOME] Unable to load local income data.",
+    );
     return [];
   }
 }
 
-function clearLocalIncome() {
-  try {
-    window.localStorage.removeItem(INCOME_STORAGE_KEY);
-  } catch {
-    console.error("Unable to clear local income.");
-  }
+function validateIncome(item: Income): boolean {
+  return (
+    typeof item.id === "string" &&
+    item.id.length > 0 &&
+    typeof item.description === "string" &&
+    item.description.trim().length > 0 &&
+    typeof item.amount === "number" &&
+    Number.isFinite(item.amount) &&
+    item.amount >= 0 &&
+    typeof item.category === "string" &&
+    INCOME_CATEGORIES.includes(item.category) &&
+    typeof item.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(item.date) &&
+    typeof item.createdAt === "string" &&
+    item.createdAt.length > 0
+  );
 }
 
-function convertSupabaseIncome(record: {
-  id: string;
-  description: string;
-  amount: number | string;
-  category: string;
-  date: string;
-  created_at: string;
-}): Income | null {
-  const income: unknown = {
-    id: record.id,
-    description: record.description,
-    amount:
-      typeof record.amount === "number"
-        ? record.amount
-        : Number(record.amount),
-    category: record.category,
-    date: record.date,
-    createdAt: record.created_at,
+function convertSupabaseIncome(
+  row: {
+    id: string;
+    description: string;
+    amount: number;
+    category: string;
+    date: string;
+    created_at: string;
+  },
+): Income | null {
+  const item: Income = {
+    id: row.id,
+    description: row.description,
+    amount: Number(row.amount),
+    category: row.category as Income["category"],
+    date: row.date,
+    createdAt: row.created_at,
   };
 
-  return isValidIncome(income) ? income : null;
+  if (!validateIncome(item)) {
+    console.error(
+      "[INCOME] Invalid income record received from Supabase.",
+      row,
+    );
+    return null;
+  }
+
+  return item;
 }
 
 async function loadAccountIncome(
@@ -119,83 +118,28 @@ async function loadAccountIncome(
 ): Promise<Income[] | null> {
   const { data, error } = await supabase
     .from("income")
-    .select("*")
+    .select(
+      "id, description, amount, category, date, created_at",
+    )
     .eq("user_id", user.id)
+    .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Unable to load account income.", error);
-    return null;
-  }
-
-  return data
-    .map((record) =>
-      convertSupabaseIncome({
-        id: record.id,
-        description: record.description,
-        amount: record.amount,
-        category: record.category,
-        date: record.date,
-        created_at: record.created_at,
-      }),
-    )
-    .filter((item): item is Income => item !== null);
-}
-
-async function migrateLocalIncome(
-  user: User,
-): Promise<Income[] | null> {
-  const localIncome = loadLocalIncome();
-
-  if (localIncome.length === 0) {
-    return null;
-  }
-
-  const {
-    data: existingIncome,
-    error: existingError,
-  } = await supabase
-    .from("income")
-    .select("id")
-    .eq("user_id", user.id);
-
-  if (existingError) {
     console.error(
-      "Unable to check existing account income.",
-      existingError,
+      "[INCOME] Unable to load account income.",
+      error,
     );
     return null;
   }
 
-  if (existingIncome.length > 0) {
-    return null;
-  }
-
-  const records = localIncome.map((item) => ({
-    id: item.id,
-    user_id: user.id,
-    description: item.description,
-    amount: item.amount,
-    category: item.category,
-    date: item.date,
-    created_at: item.createdAt,
-  }));
-
-  const { error: insertError } = await supabase
-    .from("income")
-    .insert(records);
-
-  if (insertError) {
-    console.error(
-      "Unable to migrate local income.",
-      insertError,
+  const convertedIncome = data
+    .map(convertSupabaseIncome)
+    .filter(
+      (item): item is Income => item !== null,
     );
-    return null;
-  }
 
-  clearLocalIncome();
-
-  return localIncome;
+  return convertedIncome;
 }
 
 export function IncomeProvider({
@@ -229,13 +173,25 @@ export function IncomeProvider({
         return;
       }
 
-      /*
-       * Load the local data before loading the account data.
-       * If both exist, preserve the local data until SyncProvider
-       * asks the user which dataset should be kept.
-       */
       const localIncome = loadLocalIncome();
 
+      /*
+       * If device income exists after sign-in, keep it visible.
+       *
+       * SyncProvider is the sole authority for deciding whether
+       * device data should replace account data. This provider
+       * must not automatically migrate or delete local data.
+       */
+      if (localIncome.length > 0) {
+        setIncome(localIncome);
+        setIsLoaded(true);
+        return;
+      }
+
+      /*
+       * There is no local income data, so it is safe to load the
+       * account data normally.
+       */
       const accountIncome =
         await loadAccountIncome(currentUser);
 
@@ -243,56 +199,11 @@ export function IncomeProvider({
         return;
       }
 
-      /*
-       * null means Supabase failed to load.
-       * Never treat an error as an empty account.
-       */
       if (accountIncome === null) {
         setIsLoaded(true);
         return;
       }
 
-      /*
-       * When both device and account data exist, do not silently
-       * replace the device data with account data.
-       *
-       * SyncProvider detects the same conflict and displays the
-       * explicit Keep device data / Keep account data choice.
-       */
-      if (
-        localIncome.length > 0 &&
-        accountIncome.length > 0
-      ) {
-        setIncome(localIncome);
-        setIsLoaded(true);
-        return;
-      }
-
-      /*
-       * If the account has no income but local income exists,
-       * preserve the existing automatic migration behavior.
-       */
-      if (
-        accountIncome.length === 0 &&
-        localIncome.length > 0
-      ) {
-        const migratedIncome =
-          await migrateLocalIncome(currentUser);
-
-        if (!mounted) {
-          return;
-        }
-
-        if (migratedIncome) {
-          setIncome(migratedIncome);
-          setIsLoaded(true);
-          return;
-        }
-      }
-
-      /*
-       * No conflict exists, so the account data can be loaded normally.
-       */
       setIncome(accountIncome);
       setIsLoaded(true);
     }
@@ -301,25 +212,27 @@ export function IncomeProvider({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) {
-        return;
-      }
+    } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!mounted) {
+          return;
+        }
 
-      const nextUser = session?.user ?? null;
+        const nextUser = session?.user ?? null;
 
-      if (event === "SIGNED_OUT" || !nextUser) {
-        setUser(null);
-        setIncome([]);
-        setIsLoaded(true);
-        return;
-      }
+        if (event === "SIGNED_OUT" || !nextUser) {
+          setUser(null);
+          setIncome([]);
+          setIsLoaded(true);
+          return;
+        }
 
-      if (event === "SIGNED_IN") {
-        setUser(nextUser);
-        void initialize();
-      }
-    });
+        if (event === "SIGNED_IN") {
+          setUser(nextUser);
+          void initialize();
+        }
+      },
+    );
 
     return () => {
       mounted = false;
@@ -328,6 +241,14 @@ export function IncomeProvider({
   }, []);
 
   useEffect(() => {
+    /*
+     * Local storage belongs to signed-out device data.
+     *
+     * Once signed in, SyncProvider is responsible for deciding
+     * whether device data should be uploaded or discarded.
+     * Therefore this provider must never write signed-in state
+     * back into localStorage.
+     */
     if (!isLoaded || user) {
       return;
     }
@@ -338,135 +259,204 @@ export function IncomeProvider({
         JSON.stringify(income),
       );
     } catch {
-      console.error("Unable to save income.");
+      console.error(
+        "[INCOME] Unable to save income data locally.",
+      );
     }
   }, [income, isLoaded, user]);
 
-  function addIncome(newIncome: IncomeInput) {
-    const incomeRecord: Income = {
-      ...newIncome,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-
-    if (!user) {
-      setIncome((currentIncome) => [
-        incomeRecord,
-        ...currentIncome,
-      ]);
-      return;
-    }
-
-    void (async () => {
-      const { error } = await supabase.from("income").insert({
-        id: incomeRecord.id,
-        user_id: user.id,
-        description: incomeRecord.description,
-        amount: incomeRecord.amount,
-        category: incomeRecord.category,
-        date: incomeRecord.date,
-        created_at: incomeRecord.createdAt,
-      });
-
-      if (error) {
-        console.error(
-          "Unable to save account income.",
-          error,
-        );
-        return;
-      }
-
-      setIncome((currentIncome) => [
-        incomeRecord,
-        ...currentIncome,
-      ]);
-    })();
-  }
-
-  function updateIncome(
-    id: string,
-    updatedIncome: IncomeInput,
+  async function addIncome(
+    description: string,
+    amount: number,
+    category: Income["category"],
+    date: string,
   ) {
-    if (!user) {
-      setIncome((currentIncome) =>
-        currentIncome.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                ...updatedIncome,
-              }
-            : item,
-        ),
-      );
+    const trimmedDescription = description.trim();
+
+    if (
+      !trimmedDescription ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      !INCOME_CATEGORIES.includes(category) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    ) {
+      throw new Error("Invalid income data.");
+    }
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+
+    const now = new Date().toISOString();
+
+    if (!currentUser) {
+      const newIncome: Income = {
+        id: crypto.randomUUID(),
+        description: trimmedDescription,
+        amount,
+        category,
+        date,
+        createdAt: now,
+      };
+
+      setIncome((current) => [newIncome, ...current]);
       return;
     }
 
-    void (async () => {
-      const { error } = await supabase
-        .from("income")
-        .update({
-          description: updatedIncome.description,
-          amount: updatedIncome.amount,
-          category: updatedIncome.category,
-          date: updatedIncome.date,
-        })
-        .eq("id", id)
-        .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .from("income")
+      .insert({
+        user_id: currentUser.id,
+        description: trimmedDescription,
+        amount,
+        category,
+        date,
+        created_at: now,
+      })
+      .select(
+        "id, description, amount, category, date, created_at",
+      )
+      .single();
 
-      if (error) {
-        console.error(
-          "Unable to update account income.",
-          error,
-        );
-        return;
-      }
-
-      setIncome((currentIncome) =>
-        currentIncome.map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                ...updatedIncome,
-              }
-            : item,
-        ),
+    if (error) {
+      console.error(
+        "[INCOME] Unable to add account income.",
+        error,
       );
-    })();
+      throw error;
+    }
+
+    const newIncome = convertSupabaseIncome(data);
+
+    if (!newIncome) {
+      throw new Error(
+        "The saved income record was invalid.",
+      );
+    }
+
+    setIncome((current) => [newIncome, ...current]);
   }
 
-  function deleteIncome(id: string) {
-    if (!user) {
-      setIncome((currentIncome) =>
-        currentIncome.filter((item) => item.id !== id),
+  async function updateIncome(
+    id: string,
+    description: string,
+    amount: number,
+    category: Income["category"],
+    date: string,
+  ) {
+    const trimmedDescription = description.trim();
+
+    if (
+      !id ||
+      !trimmedDescription ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      !INCOME_CATEGORIES.includes(category) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    ) {
+      throw new Error("Invalid income data.");
+    }
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+
+    if (!currentUser) {
+      setIncome((current) =>
+        current.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                description: trimmedDescription,
+                amount,
+                category,
+                date,
+              }
+            : item,
+        ),
+      );
+
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("income")
+      .update({
+        description: trimmedDescription,
+        amount,
+        category,
+        date,
+      })
+      .eq("id", id)
+      .eq("user_id", currentUser.id)
+      .select(
+        "id, description, amount, category, date, created_at",
+      )
+      .single();
+
+    if (error) {
+      console.error(
+        "[INCOME] Unable to update account income.",
+        error,
+      );
+      throw error;
+    }
+
+    const updatedIncome = convertSupabaseIncome(data);
+
+    if (!updatedIncome) {
+      throw new Error(
+        "The updated income record was invalid.",
+      );
+    }
+
+    setIncome((current) =>
+      current.map((item) =>
+        item.id === id ? updatedIncome : item,
+      ),
+    );
+  }
+
+  async function deleteIncome(id: string) {
+    if (!id) {
+      return;
+    }
+
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
+
+    if (!currentUser) {
+      setIncome((current) =>
+        current.filter((item) => item.id !== id),
       );
       return;
     }
 
-    void (async () => {
-      const { error } = await supabase
-        .from("income")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
+    const { error } = await supabase
+      .from("income")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", currentUser.id);
 
-      if (error) {
-        console.error(
-          "Unable to delete account income.",
-          error,
-        );
-        return;
-      }
-
-      setIncome((currentIncome) =>
-        currentIncome.filter((item) => item.id !== id),
+    if (error) {
+      console.error(
+        "[INCOME] Unable to delete account income.",
+        error,
       );
-    })();
+      throw error;
+    }
+
+    setIncome((current) =>
+      current.filter((item) => item.id !== id),
+    );
   }
 
   return (
     <IncomeContext.Provider
       value={{
         income,
+        isLoaded,
         addIncome,
         updateIncome,
         deleteIncome,

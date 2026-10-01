@@ -82,14 +82,6 @@ function loadLocalExpenses(): Expense[] {
   }
 }
 
-function clearLocalExpenses() {
-  try {
-    window.localStorage.removeItem(EXPENSE_STORAGE_KEY);
-  } catch {
-    console.error("Unable to clear local expenses.");
-  }
-}
-
 function convertSupabaseExpense(record: {
   id: string;
   description: string;
@@ -141,62 +133,6 @@ async function loadAccountExpenses(
     .filter((expense): expense is Expense => expense !== null);
 }
 
-async function migrateLocalExpenses(
-  user: User,
-): Promise<Expense[] | null> {
-  const localExpenses = loadLocalExpenses();
-
-  if (localExpenses.length === 0) {
-    return null;
-  }
-
-  const {
-    data: existingExpenses,
-    error: existingError,
-  } = await supabase
-    .from("expenses")
-    .select("id")
-    .eq("user_id", user.id);
-
-  if (existingError) {
-    console.error(
-      "Unable to check existing account expenses.",
-      existingError,
-    );
-    return null;
-  }
-
-  if (existingExpenses.length > 0) {
-    return null;
-  }
-
-  const records = localExpenses.map((expense) => ({
-    id: expense.id,
-    user_id: user.id,
-    description: expense.description,
-    amount: expense.amount,
-    category: expense.category,
-    date: expense.date,
-    created_at: expense.createdAt,
-  }));
-
-  const { error: insertError } = await supabase
-    .from("expenses")
-    .insert(records);
-
-  if (insertError) {
-    console.error(
-      "Unable to migrate local expenses.",
-      insertError,
-    );
-    return null;
-  }
-
-  clearLocalExpenses();
-
-  return localExpenses;
-}
-
 export function ExpenseProvider({
   children,
 }: {
@@ -229,12 +165,29 @@ export function ExpenseProvider({
       }
 
       /*
-       * Load the local data before loading the account data.
-       * If both exist, preserve the local data until SyncProvider
-       * asks the user which dataset should be kept.
+       * Always load local data first.
+       *
+       * SyncProvider is responsible for resolving conflicts between
+       * device data and account data. This provider must never
+       * automatically migrate or clear local expenses.
        */
       const localExpenses = loadLocalExpenses();
 
+      /*
+       * If device data exists, keep it visible until SyncProvider
+       * determines whether the user wants to keep device data or
+       * account data.
+       */
+      if (localExpenses.length > 0) {
+        setExpenses(localExpenses);
+        setIsLoaded(true);
+        return;
+      }
+
+      /*
+       * There is no local expense data, so it is safe to load the
+       * account data normally.
+       */
       const accountExpenses =
         await loadAccountExpenses(currentUser);
 
@@ -243,55 +196,13 @@ export function ExpenseProvider({
       }
 
       /*
-       * null means Supabase failed to load.
-       * Never treat an error as an empty account.
+       * Never treat a Supabase error as an empty account.
        */
       if (accountExpenses === null) {
         setIsLoaded(true);
         return;
       }
 
-      /*
-       * When both device and account data exist, do not silently
-       * replace the device data with account data.
-       *
-       * SyncProvider detects the same conflict and displays the
-       * explicit Keep device data / Keep account data choice.
-       */
-      if (
-        localExpenses.length > 0 &&
-        accountExpenses.length > 0
-      ) {
-        setExpenses(localExpenses);
-        setIsLoaded(true);
-        return;
-      }
-
-      /*
-       * If the account has no expenses but local expenses exist,
-       * preserve the existing automatic migration behavior.
-       */
-      if (
-        accountExpenses.length === 0 &&
-        localExpenses.length > 0
-      ) {
-        const migratedExpenses =
-          await migrateLocalExpenses(currentUser);
-
-        if (!mounted) {
-          return;
-        }
-
-        if (migratedExpenses) {
-          setExpenses(migratedExpenses);
-          setIsLoaded(true);
-          return;
-        }
-      }
-
-      /*
-       * No conflict exists, so the account data can be loaded normally.
-       */
       setExpenses(accountExpenses);
       setIsLoaded(true);
     }

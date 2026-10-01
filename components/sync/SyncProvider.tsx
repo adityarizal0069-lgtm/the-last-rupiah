@@ -50,7 +50,7 @@ function loadLocalData<T>(storageKey: string): T[] {
       : [];
   } catch {
     console.error(
-      `Unable to load local data for ${storageKey}.`,
+      `[SYNC] Unable to load local data for ${storageKey}.`,
     );
     return [];
   }
@@ -61,7 +61,7 @@ function clearLocalData(storageKey: string) {
     window.localStorage.removeItem(storageKey);
   } catch {
     console.error(
-      `Unable to clear local data for ${storageKey}.`,
+      `[SYNC] Unable to clear local data for ${storageKey}.`,
     );
   }
 }
@@ -90,7 +90,7 @@ async function getAccountCounts(user: User) {
 
   if (expenseError) {
     console.error(
-      "Unable to check account expenses.",
+      "[SYNC] Unable to check account expenses.",
       expenseError,
     );
     return null;
@@ -98,7 +98,7 @@ async function getAccountCounts(user: User) {
 
   if (incomeError) {
     console.error(
-      "Unable to check account income.",
+      "[SYNC] Unable to check account income.",
       incomeError,
     );
     return null;
@@ -128,7 +128,7 @@ async function getExistingAccountIds(user: User) {
 
   if (expenseError) {
     console.error(
-      "Unable to read existing account expenses.",
+      "[SYNC] Unable to read existing account expenses.",
       expenseError,
     );
     return null;
@@ -136,7 +136,7 @@ async function getExistingAccountIds(user: User) {
 
   if (incomeError) {
     console.error(
-      "Unable to read existing account income.",
+      "[SYNC] Unable to read existing account income.",
       incomeError,
     );
     return null;
@@ -153,6 +153,20 @@ async function uploadDeviceData(
   expenses: Expense[],
   income: Income[],
 ) {
+  console.log("[SYNC] Starting device data upload.");
+  console.log("[SYNC] Device expenses:", expenses.length);
+  console.log("[SYNC] Device income:", income.length);
+
+  console.log(
+    "[SYNC] Device expense data:",
+    expenses,
+  );
+
+  console.log(
+    "[SYNC] Device income data:",
+    income,
+  );
+
   const expenseRecords = expenses.map((expense) => ({
     id: crypto.randomUUID(),
     user_id: user.id,
@@ -173,49 +187,156 @@ async function uploadDeviceData(
     created_at: item.createdAt,
   }));
 
+  console.log(
+    "[SYNC] Prepared expense records:",
+    expenseRecords,
+  );
+
+  console.log(
+    "[SYNC] Prepared income records:",
+    incomeRecords,
+  );
+
   if (expenseRecords.length > 0) {
-    const { error } = await supabase
+    console.log(
+      "[SYNC] Attempting expense insert:",
+      expenseRecords.length,
+    );
+
+    const { data, error } = await supabase
       .from("expenses")
-      .insert(expenseRecords);
+      .insert(expenseRecords)
+      .select();
 
     if (error) {
       console.error(
-        "Unable to upload device expenses.",
+        "[SYNC] EXPENSE INSERT FAILED.",
         error,
       );
+
+      console.error(
+        "[SYNC] Expense error message:",
+        error.message,
+      );
+
+      console.error(
+        "[SYNC] Expense error details:",
+        error.details,
+      );
+
+      console.error(
+        "[SYNC] Expense error hint:",
+        error.hint,
+      );
+
+      console.error(
+        "[SYNC] Expense error code:",
+        error.code,
+      );
+
       return null;
     }
+
+    console.log(
+      "[SYNC] EXPENSE INSERT SUCCEEDED.",
+      data,
+    );
+  } else {
+    console.log(
+      "[SYNC] No device expenses to upload.",
+    );
   }
 
   if (incomeRecords.length > 0) {
-    const { error } = await supabase
+    console.log(
+      "[SYNC] Attempting income insert:",
+      incomeRecords.length,
+    );
+
+    const { data, error } = await supabase
       .from("income")
-      .insert(incomeRecords);
+      .insert(incomeRecords)
+      .select();
 
     if (error) {
       console.error(
-        "Unable to upload device income.",
+        "[SYNC] INCOME INSERT FAILED.",
         error,
       );
 
+      console.error(
+        "[SYNC] Income error message:",
+        error.message,
+      );
+
+      console.error(
+        "[SYNC] Income error details:",
+        error.details,
+      );
+
+      console.error(
+        "[SYNC] Income error hint:",
+        error.hint,
+      );
+
+      console.error(
+        "[SYNC] Income error code:",
+        error.code,
+      );
+
       if (expenseRecords.length > 0) {
-        await supabase
-          .from("expenses")
-          .delete()
-          .in(
-            "id",
-            expenseRecords.map((record) => record.id),
-          )
-          .eq("user_id", user.id);
+        console.log(
+          "[SYNC] Rolling back uploaded expenses.",
+        );
+
+        const { error: rollbackError } =
+          await supabase
+            .from("expenses")
+            .delete()
+            .in(
+              "id",
+              expenseRecords.map(
+                (record) => record.id,
+              ),
+            )
+            .eq("user_id", user.id);
+
+        if (rollbackError) {
+          console.error(
+            "[SYNC] Expense rollback failed.",
+            rollbackError,
+          );
+        } else {
+          console.log(
+            "[SYNC] Expense rollback succeeded.",
+          );
+        }
       }
 
       return null;
     }
+
+    console.log(
+      "[SYNC] INCOME INSERT SUCCEEDED.",
+      data,
+    );
+  } else {
+    console.log(
+      "[SYNC] No device income to upload.",
+    );
   }
 
+  console.log(
+    "[SYNC] Device data upload completed.",
+  );
+
   return {
-    expenseIds: expenseRecords.map((record) => record.id),
-    incomeIds: incomeRecords.map((record) => record.id),
+    expenseIds: expenseRecords.map(
+      (record) => record.id,
+    ),
+    incomeIds: incomeRecords.map(
+      (record) => record.id,
+    ),
   };
 }
 
@@ -224,16 +345,44 @@ async function verifyUploadedData(
   expectedExpenseCount: number,
   expectedIncomeCount: number,
 ) {
+  console.log(
+    "[SYNC] Verifying uploaded data.",
+  );
+
+  console.log(
+    "[SYNC] Expected expenses:",
+    expectedExpenseCount,
+  );
+
+  console.log(
+    "[SYNC] Expected income:",
+    expectedIncomeCount,
+  );
+
   const counts = await getAccountCounts(user);
 
   if (!counts) {
+    console.error(
+      "[SYNC] Verification could not read account counts.",
+    );
     return false;
   }
 
-  return (
-    counts.expenses >= expectedExpenseCount &&
-    counts.income >= expectedIncomeCount
+  console.log(
+    "[SYNC] Account counts after upload:",
+    counts,
   );
+
+  const verified =
+    counts.expenses >= expectedExpenseCount &&
+    counts.income >= expectedIncomeCount;
+
+  console.log(
+    "[SYNC] Verification result:",
+    verified,
+  );
+
+  return verified;
 }
 
 async function deleteOldAccountData(
@@ -241,6 +390,20 @@ async function deleteOldAccountData(
   oldExpenseIds: string[],
   oldIncomeIds: string[],
 ) {
+  console.log(
+    "[SYNC] Removing old account data.",
+  );
+
+  console.log(
+    "[SYNC] Old expense count:",
+    oldExpenseIds.length,
+  );
+
+  console.log(
+    "[SYNC] Old income count:",
+    oldIncomeIds.length,
+  );
+
   if (oldExpenseIds.length > 0) {
     const { error } = await supabase
       .from("expenses")
@@ -250,11 +413,15 @@ async function deleteOldAccountData(
 
     if (error) {
       console.error(
-        "Unable to remove old account expenses.",
+        "[SYNC] Unable to remove old account expenses.",
         error,
       );
       return false;
     }
+
+    console.log(
+      "[SYNC] Old account expenses removed.",
+    );
   }
 
   if (oldIncomeIds.length > 0) {
@@ -266,11 +433,15 @@ async function deleteOldAccountData(
 
     if (error) {
       console.error(
-        "Unable to remove old account income.",
+        "[SYNC] Unable to remove old account income.",
         error,
       );
       return false;
     }
+
+    console.log(
+      "[SYNC] Old account income removed.",
+    );
   }
 
   return true;
@@ -379,11 +550,18 @@ export function SyncProvider({
 
   function confirmKeepDeviceData() {
     if (!user) {
+      console.error(
+        "[SYNC] Cannot keep device data because there is no user.",
+      );
       return;
     }
 
     void (async () => {
       setIsSyncing(true);
+
+      console.log(
+        "[SYNC] ===== KEEP DEVICE DATA STARTED =====",
+      );
 
       const localExpenses =
         loadLocalData<Expense>(EXPENSE_STORAGE_KEY);
@@ -391,13 +569,36 @@ export function SyncProvider({
       const localIncome =
         loadLocalData<Income>(INCOME_STORAGE_KEY);
 
+      console.log(
+        "[SYNC] Local expenses loaded:",
+        localExpenses.length,
+      );
+
+      console.log(
+        "[SYNC] Local income loaded:",
+        localIncome.length,
+      );
+
       const existingIds =
         await getExistingAccountIds(user);
 
       if (!existingIds) {
+        console.error(
+          "[SYNC] Could not get existing account IDs.",
+        );
         setIsSyncing(false);
         return;
       }
+
+      console.log(
+        "[SYNC] Existing account expenses:",
+        existingIds.expenses.length,
+      );
+
+      console.log(
+        "[SYNC] Existing account income:",
+        existingIds.income.length,
+      );
 
       const uploaded = await uploadDeviceData(
         user,
@@ -406,9 +607,22 @@ export function SyncProvider({
       );
 
       if (!uploaded) {
+        console.error(
+          "[SYNC] Device upload failed.",
+        );
         setIsSyncing(false);
         return;
       }
+
+      console.log(
+        "[SYNC] Uploaded expense IDs:",
+        uploaded.expenseIds,
+      );
+
+      console.log(
+        "[SYNC] Uploaded income IDs:",
+        uploaded.incomeIds,
+      );
 
       const verified = await verifyUploadedData(
         user,
@@ -417,21 +631,39 @@ export function SyncProvider({
       );
 
       if (!verified) {
-        await supabase
-          .from("expenses")
-          .delete()
-          .in("id", uploaded.expenseIds)
-          .eq("user_id", user.id);
-
-        await supabase
-          .from("income")
-          .delete()
-          .in("id", uploaded.incomeIds)
-          .eq("user_id", user.id);
-
         console.error(
-          "Device data upload could not be verified.",
+          "[SYNC] Device data upload could not be verified. Starting cleanup.",
         );
+
+        if (uploaded.expenseIds.length > 0) {
+          const { error } = await supabase
+            .from("expenses")
+            .delete()
+            .in("id", uploaded.expenseIds)
+            .eq("user_id", user.id);
+
+          if (error) {
+            console.error(
+              "[SYNC] Failed to clean up uploaded expenses.",
+              error,
+            );
+          }
+        }
+
+        if (uploaded.incomeIds.length > 0) {
+          const { error } = await supabase
+            .from("income")
+            .delete()
+            .in("id", uploaded.incomeIds)
+            .eq("user_id", user.id);
+
+          if (error) {
+            console.error(
+              "[SYNC] Failed to clean up uploaded income.",
+              error,
+            );
+          }
+        }
 
         setIsSyncing(false);
         return;
@@ -446,7 +678,7 @@ export function SyncProvider({
 
       if (!oldDataDeleted) {
         console.error(
-          "Old account data could not be completely replaced.",
+          "[SYNC] Old account data could not be completely replaced.",
         );
 
         setIsSyncing(false);
@@ -456,9 +688,21 @@ export function SyncProvider({
       clearLocalData(EXPENSE_STORAGE_KEY);
       clearLocalData(INCOME_STORAGE_KEY);
 
+      console.log(
+        "[SYNC] Local expense storage cleared.",
+      );
+
+      console.log(
+        "[SYNC] Local income storage cleared.",
+      );
+
       setDeviceDataWarning(false);
       setSyncRequired(false);
       setIsSyncing(false);
+
+      console.log(
+        "[SYNC] ===== KEEP DEVICE DATA COMPLETED =====",
+      );
 
       window.location.reload();
     })();

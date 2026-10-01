@@ -64,7 +64,9 @@ export default function IncomeForm() {
     return "";
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     const validationError = validateForm();
@@ -76,14 +78,20 @@ export default function IncomeForm() {
 
     setError("");
 
-    addIncome({
-      description: description.trim(),
-      amount: Number(amount),
-      category,
-      date,
-    });
+    try {
+      await addIncome(
+        description.trim(),
+        Number(amount),
+        category,
+        date,
+      );
 
-    router.push("/income");
+      router.push("/income");
+    } catch {
+      setError(
+        "Unable to save income. Please try again.",
+      );
+    }
   }
 
   return (
