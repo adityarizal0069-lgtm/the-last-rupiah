@@ -288,10 +288,11 @@ export function IncomeProvider({
     } = await supabase.auth.getUser();
 
     const now = new Date().toISOString();
+    const newIncomeId = crypto.randomUUID();
 
     if (!currentUser) {
       const newIncome: Income = {
-        id: crypto.randomUUID(),
+        id: newIncomeId,
         description: trimmedDescription,
         amount,
         category,
@@ -306,6 +307,7 @@ export function IncomeProvider({
     const { data, error } = await supabase
       .from("income")
       .insert({
+        id: newIncomeId,
         user_id: currentUser.id,
         description: trimmedDescription,
         amount,
